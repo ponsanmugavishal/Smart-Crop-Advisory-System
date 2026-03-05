@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}Smart Farm{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css?v=20260218c" />
+    {% block extra_head %}{% endblock %}
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand-panel">
+          <h1 data-i18n="topbar.title">Smart Farm Intelligence</h1>
+          <p data-i18n="topbar.subtitle">Retro Control Hub</p>
+        </div>
+
+        <nav class="side-nav">
+          <a href="/" data-i18n="nav.home">Home</a>
+          <a href="/dashboard" data-i18n="nav.dashboard">Dashboard</a>
+          <a href="/suggestions" data-i18n="nav.suggestions">Suggestions</a>
+          <a href="/status" data-i18n="nav.status">Status</a>
+        </nav>
+
+        <div class="side-settings card">
+          <label for="languageSelect" data-i18n="nav.language">Language</label>
+          <select id="languageSelect" class="lang-select">
+            <option value="en">English</option>
+            <option value="ta">தமிழ்</option>
+            <option value="hi">हिन्दी</option>
+          </select>
+        </div>
+      </aside>
+
+      <div class="main-area">
+        <header class="topbar">
+          <h2>{% block page_title %}Smart Farm Overview{% endblock %}</h2>
+          <p>{% block page_subtitle %}Simple, fast and easy to use monitoring experience{% endblock %}</p>
+        </header>
+
+        <main class="container">
+          {% block content %}{% endblock %}
+        </main>
+      </div>
+    </div>
+
+    <script src="/static/i18n.js"></script>
+    <script>
+      (function () {
+        const currentPath = window.location.pathname || '/';
+        const links = document.querySelectorAll('.side-nav a');
+        links.forEach((link) => {
+          if (link.getAttribute('href') === currentPath) {
+            link.classList.add('active');
+          }
+        });
+      })();
+    </script>
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

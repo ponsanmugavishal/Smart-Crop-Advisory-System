@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Suggestions{% endblock %}
+
+{% block content %}
+<section class="controls card">
+  <div class="control-item grow">
+    <label for="fieldSelect" data-i18n="common.field">Field</label>
+    <select id="fieldSelect"></select>
+  </div>
+  <div class="actions-row">
+    <button id="refreshBtn" data-i18n="suggestions.refreshSuggestion">Refresh Suggestion</button>
+    <button id="recommendBtn" class="secondary" data-i18n="common.runRule">Run Rule Suggestion</button>
+    <button id="improveBtn" class="secondary" data-i18n="suggestions.improveBtn">Generate Improvements</button>
+  </div>
+  <p id="suggestionActionStatus">--</p>
+</section>
+
+<section class="card recommendation-card">
+  <h2 data-i18n="suggestions.title">Automatic Field Suggestion (Rule-Based)</h2>
+  <div class="suggestion-grid">
+    <section class="suggestion-block">
+      <h3 data-i18n="suggestions.recommendationMetaTitle">Recommendation Meta</h3>
+      <p><strong data-i18n="common.status">Status:</strong> <span id="healthStatus">--</span></p>
+      <p><strong data-i18n="common.irrigation">Irrigation:</strong> <span id="irrigationAction">--</span></p>
+      <p><strong data-i18n="suggestions.confidence">Confidence:</strong> <span id="confidence">--</span></p>
+      <p><strong data-i18n="suggestions.riskLevel">Risk Level:</strong> <span id="suggestionRisk">--</span></p>
+      <p><strong data-i18n="suggestions.priority">Priority:</strong> <span id="priorityLevel">--</span></p>
+      <p><strong data-i18n="suggestions.nextCheck">Next Check:</strong> <span id="nextCheck">--</span></p>
+      <p><strong data-i18n="suggestions.generatedAt">Generated At:</strong> <span id="generatedAt">--</span></p>
+    </section>
+
+    <section class="suggestion-block">
+      <h3 data-i18n="suggestions.currentReadingTitle">Current Reading Snapshot</h3>
+      <p><strong data-i18n="suggestions.moistureNow">Soil Moisture:</strong> <span id="moistureNow">--</span></p>
+      <p><strong data-i18n="suggestions.tempNow">Temperature:</strong> <span id="tempNow">--</span></p>
+      <p><strong data-i18n="suggestions.humidityNow">Humidity:</strong> <span id="humidityNow">--</span></p>
+      <p><strong data-i18n="suggestions.rainNow">Rain:</strong> <span id="rainNow">--</span></p>
+    </section>
+  </div>
+
+  <section class="suggestion-block full-width">
+    <p><strong data-i18n="suggestions.resourceTip">Resource Tip:</strong> <span id="resourceTip">--</span></p>
+    <p><strong data-i18n="suggestions.summary">Summary:</strong> <span id="summary">--</span></p>
+  </section>
+
+  <section class="suggestion-block full-width">
+    <h3 data-i18n="suggestions.actionChecklist">Action Checklist</h3>
+    <ul id="actionChecklist" class="summary-list">
+      <li>--</li>
+    </ul>
+  </section>
+
+  <section class="suggestion-block full-width">
+    <h3 data-i18n="suggestions.improvementTitle">Improvement Suggestions</h3>
+    <ul id="improvementList" class="summary-list">
+      <li>--</li>
+    </ul>
+  </section>
+
+  <section class="suggestion-block full-width">
+    <h3 data-i18n="suggestions.detailTitle">Detailed Field Insights</h3>
+    <p><strong data-i18n="suggestions.overallInsight">Overall Insight:</strong> <span id="insightOverview">--</span></p>
+    <p><strong data-i18n="suggestions.moistureAnalysis">Moisture Analysis:</strong> <span id="moistureInsight">--</span></p>
+    <p><strong data-i18n="suggestions.weatherInteraction">Weather Interaction:</strong> <span id="weatherInsight">--</span></p>
+    <p><strong data-i18n="suggestions.executionPlan">Recommended Execution Plan:</strong> <span id="actionPlanInsight">--</span></p>
+  </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/common.js"></script>
+<script src="/static/suggestions.js"></script>
+{% endblock %}

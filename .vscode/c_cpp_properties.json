@@ -1,0 +1,24 @@
+{
+  "configurations": [
+    {
+      "name": "Win32",
+      "includePath": [
+        "${workspaceFolder}/**",
+        "C:/Users/PON SANMUGA VISHAL G/Documents/Arduino/libraries/**",
+        "C:/Users/PON SANMUGA VISHAL G/AppData/Local/Arduino15/packages/esp32/hardware/esp32/*/cores/esp32",
+        "C:/Users/PON SANMUGA VISHAL G/AppData/Local/Arduino15/packages/esp32/hardware/esp32/*/variants/**",
+        "C:/Users/PON SANMUGA VISHAL G/AppData/Local/Arduino15/packages/**"
+      ],
+      "defines": [
+        "ARDUINO=10819",
+        "ESP32",
+        "ARDUINO_ARCH_ESP32",
+        "F_CPU=240000000L"
+      ],
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "windows-gcc-x64"
+    }
+  ],
+  "version": 4
+}

@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Field Command Dashboard{% endblock %}
+{% block page_subtitle %}Retro-futuristic control panel with separated trends and detail panes{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<section class="dashboard-layout">
+  <div class="main-column">
+    <section class="controls card">
+      <div class="control-item grow">
+        <label for="fieldSelect" data-i18n="common.field">Field</label>
+        <select id="fieldSelect"></select>
+      </div>
+
+      <div class="control-item">
+        <label for="hoursSelect" data-i18n="dashboard.historyWindow">History Window</label>
+        <select id="hoursSelect">
+          <option value="6">Last 6 Hours</option>
+          <option value="12">Last 12 Hours</option>
+          <option value="24" data-i18n="dashboard.last24">Last 24 Hours</option>
+          <option value="48" selected data-i18n="dashboard.last48">Last 48 Hours</option>
+          <option value="72" data-i18n="dashboard.last72">Last 72 Hours</option>
+        </select>
+      </div>
+
+      <div class="control-item">
+        <label for="autoRefreshSelect" data-i18n="dashboard.autoRefresh">Auto Refresh</label>
+        <select id="autoRefreshSelect">
+          <option value="0" data-i18n="dashboard.off">Off</option>
+          <option value="15">Every 15s</option>
+          <option value="30" data-i18n="dashboard.every30">Every 30s</option>
+          <option value="60" selected data-i18n="dashboard.every60">Every 60s</option>
+          <option value="120" data-i18n="dashboard.every120">Every 2 min</option>
+        </select>
+      </div>
+
+      <div class="control-item">
+        <label for="chartMetricSelect" data-i18n="dashboard.chartFocus">Chart Focus</label>
+        <select id="chartMetricSelect">
+          <option value="all" data-i18n="dashboard.focusAll">All Metrics</option>
+          <option value="moisture" data-i18n="metrics.moisture">Soil Moisture</option>
+          <option value="temperature" data-i18n="metrics.temperature">Temperature</option>
+          <option value="humidity" data-i18n="metrics.humidity">Humidity</option>
+        </select>
+      </div>
+
+      <div class="actions-row full-width">
+        <button id="refreshBtn" data-i18n="common.refreshNow">Refresh Now</button>
+        <button id="recommendBtn" class="secondary" data-i18n="common.runRule">Run Rule Suggestion</button>
+        <button id="manualCheckBtn" class="secondary" data-i18n="dashboard.manualCheck">Check Device Now</button>
+        <button id="exportBtn" class="ghost" data-i18n="dashboard.exportCsv">Export Trends CSV</button>
+      </div>
+    </section>
+
+    <section class="card quick-status">
+      <div>
+        <h2 data-i18n="dashboard.statusTitle">Dashboard Status</h2>
+        <p id="lastUpdated">Last updated: --</p>
+      </div>
+      <div class="status-chip" id="healthChip">Status: --</div>
+    </section>
+
+    <section class="metrics-grid">
+      <div class="card metric metric-risk" id="moistureCard">
+        <h3 data-i18n="metrics.moisture">Soil Moisture</h3>
+        <span class="risk-pill" id="moistureRisk">--</span>
+        <p id="moistureVal">-- %</p>
+      </div>
+      <div class="card metric metric-risk" id="rainCard">
+        <h3 data-i18n="metrics.rain">Rain</h3>
+        <span class="risk-pill" id="rainRisk">--</span>
+        <p id="rainVal">--</p>
+      </div>
+      <div class="card metric metric-risk" id="tempCard">
+        <h3 data-i18n="metrics.temperature">Temperature</h3>
+        <span class="risk-pill" id="tempRisk">--</span>
+        <p id="tempVal">-- °C</p>
+      </div>
+      <div class="card metric metric-risk" id="humCard">
+        <h3 data-i18n="metrics.humidity">Humidity</h3>
+        <span class="risk-pill" id="humRisk">--</span>
+        <p id="humVal">-- %</p>
+      </div>
+    </section>
+
+    <section class="card comparison-card">
+      <div class="section-head">
+        <h2 data-i18n="dashboard.comparisonTitle">Historical Comparison</h2>
+        <span class="pill" data-i18n="dashboard.comparisonWindow">Today vs Last Week, This Season vs Previous</span>
+      </div>
+      <div class="comparison-grid">
+        <div class="comparison-item">
+          <h3 data-i18n="dashboard.todayVsWeek">Today vs Last Week</h3>
+          <p id="todayVsWeek">--</p>
+        </div>
+        <div class="comparison-item">
+          <h3 data-i18n="dashboard.seasonVsPrevious">This Season vs Previous</h3>
+          <p id="seasonVsPrevious">--</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card chart-card">
+      <div class="section-head">
+        <h2 data-i18n="dashboard.sensorTrends">Sensor Trends</h2>
+        <span id="historyPointCount" class="pill">0 points</span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="trendChart"></canvas>
+      </div>
+    </section>
+  </div>
+
+  <aside class="detail-column">
+    <section class="card detail-card">
+      <h3 data-i18n="dashboard.liveDetails">Live Reading Details</h3>
+      <div class="detail-row"><span data-i18n="dashboard.source">Source</span><strong id="detailSource">--</strong></div>
+      <div class="detail-row"><span data-i18n="dashboard.recordedAt">Recorded At</span><strong id="detailRecordedAt">--</strong></div>
+      <div class="detail-row"><span data-i18n="dashboard.selectedField">Selected Field</span><strong id="detailField">--</strong></div>
+    </section>
+
+    <section class="card detail-card">
+      <h3 data-i18n="dashboard.recommendationPanel">Recommendation Panel</h3>
+      <div class="detail-row"><span data-i18n="common.status">Status</span><strong id="detailHealth">--</strong></div>
+      <div class="detail-row"><span data-i18n="common.irrigation">Irrigation</span><strong id="detailIrrigation">--</strong></div>
+      <div class="detail-row"><span data-i18n="suggestions.confidence">Confidence:</span><strong id="detailConfidence">--</strong></div>
+      <p class="detail-paragraph" id="detailResource">--</p>
+      <p class="detail-paragraph" id="detailSummary">--</p>
+    </section>
+
+    <section class="card detail-card">
+      <h3 data-i18n="dashboard.weeklySummary">Weekly Summary</h3>
+      <p class="detail-paragraph" id="weeklySummaryIntro">--</p>
+      <ul class="summary-list" id="weeklySummaryList">
+        <li>--</li>
+      </ul>
+    </section>
+
+    <section class="card detail-card">
+      <h3 data-i18n="dashboard.sessionPanel">Session Panel</h3>
+      <div class="detail-row"><span data-i18n="dashboard.window">Window</span><strong id="detailWindow">48 hours</strong></div>
+      <div class="detail-row"><span data-i18n="dashboard.autoRefresh">Auto Refresh</span><strong id="detailAutoRefresh">60s</strong></div>
+      <div class="detail-row"><span data-i18n="dashboard.chartFocus">Chart Focus</span><strong id="detailChartFocus">All Metrics</strong></div>
+    </section>
+  </aside>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/common.js"></script>
+<script src="/static/dashboard.js?v=20260218c"></script>
+{% endblock %}

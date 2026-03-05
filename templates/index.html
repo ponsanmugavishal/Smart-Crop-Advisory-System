@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Smart Farm Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>Smart Farm Intelligence Dashboard</h1>
+      <p>Single Farmer • Multiple Fields • Real-time Decision Support</p>
+    </header>
+
+    <main class="container">
+      <section class="controls card">
+        <div class="control-item grow">
+          <label for="fieldSelect">Field</label>
+          <select id="fieldSelect"></select>
+        </div>
+
+        <div class="control-item">
+          <label for="hoursSelect">History Window</label>
+          <select id="hoursSelect">
+            <option value="24">Last 24 Hours</option>
+            <option value="48" selected>Last 48 Hours</option>
+            <option value="72">Last 72 Hours</option>
+          </select>
+        </div>
+
+        <div class="control-item">
+          <label for="autoRefreshSelect">Auto Refresh</label>
+          <select id="autoRefreshSelect">
+            <option value="0">Off</option>
+            <option value="30">Every 30s</option>
+            <option value="60" selected>Every 60s</option>
+            <option value="120">Every 2 min</option>
+          </select>
+        </div>
+
+        <div class="actions-row">
+          <button id="refreshBtn">Refresh Now</button>
+          <button id="recommendBtn" class="secondary">Run Rule Suggestion</button>
+        </div>
+      </section>
+
+      <section class="card quick-status">
+        <div>
+          <h2>Farm Assistant</h2>
+          <p id="lastUpdated">Last updated: --</p>
+        </div>
+        <div class="status-chip" id="healthChip">Status: --</div>
+      </section>
+
+      <section class="metrics-grid">
+        <div class="card metric">
+          <h3>Soil Moisture</h3>
+          <p id="moistureVal">-- %</p>
+        </div>
+        <div class="card metric">
+          <h3>Rain</h3>
+          <p id="rainVal">--</p>
+        </div>
+        <div class="card metric">
+          <h3>Temperature</h3>
+          <p id="tempVal">-- °C</p>
+        </div>
+        <div class="card metric">
+          <h3>Humidity</h3>
+          <p id="humVal">-- %</p>
+        </div>
+      </section>
+
+      <section class="card chart-card">
+        <h2>48-Hour Sensor Trends</h2>
+        <canvas id="trendChart"></canvas>
+      </section>
+
+      <section class="card recommendation-card">
+        <h2>Automatic Field Suggestion (Rule-Based)</h2>
+        <p><strong>Status:</strong> <span id="healthStatus">--</span></p>
+        <p><strong>Irrigation:</strong> <span id="irrigationAction">--</span></p>
+        <p><strong>Resource Tip:</strong> <span id="resourceTip">--</span></p>
+        <p><strong>Confidence:</strong> <span id="confidence">--</span></p>
+        <p><strong>Summary:</strong> <span id="summary">--</span></p>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

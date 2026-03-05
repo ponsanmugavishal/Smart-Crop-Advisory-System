@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Smart Farm Home{% endblock %}
+
+{% block content %}
+<section class="card home-canvas">
+  <div class="home-layer-grid" aria-hidden="true"></div>
+  <div class="home-layer-circuit" aria-hidden="true">
+    <span class="c-node node-1"></span>
+    <span class="c-node node-2"></span>
+    <span class="c-node node-3"></span>
+    <span class="c-node node-4"></span>
+    <span class="c-node node-5"></span>
+  </div>
+  <div class="home-layer-beam" aria-hidden="true"></div>
+  <div class="home-layer-orbs" aria-hidden="true">
+    <span></span><span></span><span></span><span></span><span></span>
+  </div>
+
+  <div class="home-canvas-content">
+    <div class="home-canvas-left">
+      <h2 data-i18n="home.welcome">Welcome</h2>
+
+      <div class="home-chip-row">
+        <span class="pill" data-i18n="nav.dashboard">Dashboard</span>
+        <span class="pill" data-i18n="nav.suggestions">Suggestions</span>
+        <span class="pill" data-i18n="nav.status">Status</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="home-grid">
+  <a class="card metric nav-card home-nav-card" href="/dashboard">
+    <h3 data-i18n="home.card.dashboard.title">Dashboard</h3>
+    <p data-i18n="home.card.dashboard.desc">Live sensor view and trends</p>
+  </a>
+  <a class="card metric nav-card home-nav-card" href="/suggestions">
+    <h3 data-i18n="home.card.suggestions.title">Suggestions</h3>
+    <p data-i18n="home.card.suggestions.desc">Automatic rule-based recommendations</p>
+  </a>
+  <a class="card metric nav-card home-nav-card" href="/status">
+    <h3 data-i18n="home.card.status.title">Status</h3>
+    <p data-i18n="home.card.status.desc">System and field health overview</p>
+  </a>
+  <div class="card metric home-nav-card mode-card">
+    <h3 data-i18n="home.card.mode.title">Mode</h3>
+    <p data-i18n="home.card.mode.desc">User Friendly</p>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Status{% endblock %}
+
+{% block content %}
+<section class="controls card">
+  <div class="control-item grow">
+    <label for="fieldSelect" data-i18n="common.field">Field</label>
+    <select id="fieldSelect"></select>
+  </div>
+  <div class="actions-row">
+    <button id="refreshBtn" data-i18n="status.refreshStatus">Refresh Status</button>
+  </div>
+  <p id="statusActionStatus">--</p>
+</section>
+
+<section class="status-layout">
+  <div class="card status-overview-card">
+    <div class="section-head">
+      <h2 data-i18n="status.statusNow">Current Field Status</h2>
+      <span class="status-chip" id="fieldStatusChip">--</span>
+    </div>
+
+    <div class="status-grid">
+      <div class="status-item">
+        <span data-i18n="status.fieldHealth">Field Health</span>
+        <strong id="statusHealth">--</strong>
+      </div>
+      <div class="status-item">
+        <span data-i18n="status.irrigationState">Irrigation State</span>
+        <strong id="statusIrrigation">--</strong>
+      </div>
+      <div class="status-item">
+        <span data-i18n="metrics.moisture">Soil Moisture</span>
+        <strong id="statusMoisture">--</strong>
+      </div>
+      <div class="status-item">
+        <span data-i18n="metrics.temperature">Temperature</span>
+        <strong id="statusTemp">--</strong>
+      </div>
+      <div class="status-item">
+        <span data-i18n="metrics.humidity">Humidity</span>
+        <strong id="statusHumidity">--</strong>
+      </div>
+      <div class="status-item">
+        <span data-i18n="metrics.rain">Rain</span>
+        <strong id="statusRain">--</strong>
+      </div>
+      <div class="status-item">
+        <span data-i18n="status.lastReading">Last Reading Time</span>
+        <strong id="statusReadingTime">--</strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="card status-alert-card">
+    <div class="section-head">
+      <h3 data-i18n="status.esp32Title">ESP32 Device Status</h3>
+      <span class="status-chip" id="esp32Chip">--</span>
+    </div>
+    <div class="status-grid">
+      <div class="status-item">
+        <span data-i18n="status.esp32Connection">Connection</span>
+        <strong id="esp32Connection">--</strong>
+      </div>
+      <div class="status-item">
+        <span data-i18n="status.esp32LastSeen">Last Seen</span>
+        <strong id="esp32LastSeen">--</strong>
+      </div>
+      <div class="status-item">
+        <span data-i18n="status.esp32Source">Latest Source</span>
+        <strong id="esp32Source">--</strong>
+      </div>
+      <div class="status-item">
+        <span data-i18n="status.commandQueue">Command Queue</span>
+        <strong id="esp32Queue">--</strong>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card recommendation-card">
+  <h2 data-i18n="status.currentSummary">Current Status Summary</h2>
+  <p id="statusSummary" data-i18n="status.noStatus">No status available.</p>
+  <p id="statusRefreshInfo" class="detail-paragraph">--</p>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/common.js"></script>
+<script src="/static/status.js"></script>
+{% endblock %}
