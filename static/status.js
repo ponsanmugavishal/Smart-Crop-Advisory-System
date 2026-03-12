@@ -11,6 +11,10 @@ function tr(templateKey, fallback, replacements = {}) {
 }
 
 let busy = false;
+let autoRefreshTimer = null;
+const STATUS_AUTO_REFRESH_MS = 5000;
+let socket = null;
+let subscribedFieldId = null;
 
 function setActionStatus(text) {
   setText('statusActionStatus', text || '--');
@@ -108,12 +112,7 @@ function renderEmpty() {
   setEsp32Chip('--');
 }
 
-async function loadStatus(fieldId) {
-  const [latestPayload, devicePayload] = await Promise.all([
-    loadLatestPayload(fieldId),
-    fetchJson(`/api/device/status?field_id=${encodeURIComponent(fieldId)}`),
-  ]);
-
+function renderStatusFromPayload(latestPayload, devicePayload) {
   const reading = latestPayload.latest_reading;
   const recommendation = latestPayload.latest_recommendation;
 
@@ -163,9 +162,71 @@ async function loadStatus(fieldId) {
   setText('statusSummary', summary);
 }
 
+async function loadStatus(fieldId) {
+  const [latestPayload, devicePayload] = await Promise.all([
+    loadLatestPayload(fieldId),
+    fetchJson(`/api/device/status?field_id=${encodeURIComponent(fieldId)}`),
+  ]);
+
+  renderStatusFromPayload(latestPayload, devicePayload);
+}
+
 async function refreshStatus(fieldId) {
-  await runRuleSuggestion(fieldId);
   await loadStatus(fieldId);
+}
+
+async function autoRefreshStatus() {
+  const fieldId = document.getElementById('fieldSelect')?.value;
+  if (!fieldId || busy) return;
+
+  try {
+    await loadStatus(fieldId);
+    setActionStatus(
+      tr('runtime.lastUpdated', 'Last updated: {time}', {
+        time: new Date().toLocaleTimeString(),
+      })
+    );
+  } catch (error) {
+    console.error(error);
+    setActionStatus(t('runtime.failedStatus', 'Failed to load status data. Check backend and database setup.'));
+  }
+}
+
+function startAutoRefresh() {
+  if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+  autoRefreshTimer = setInterval(autoRefreshStatus, STATUS_AUTO_REFRESH_MS);
+}
+
+function subscribeToFieldRealtime(fieldId) {
+  if (!socket || !fieldId) return;
+
+  if (subscribedFieldId && Number(subscribedFieldId) !== Number(fieldId)) {
+    socket.emit('unsubscribe_field', { field_id: Number(subscribedFieldId) });
+  }
+
+  subscribedFieldId = Number(fieldId);
+  socket.emit('subscribe_field', { field_id: Number(fieldId) });
+}
+
+function setupRealtimeSocket() {
+  if (!window.io) return;
+
+  socket = window.io();
+  socket.on('connect', () => {
+    const selectedField = document.getElementById('fieldSelect')?.value;
+    if (selectedField) subscribeToFieldRealtime(selectedField);
+  });
+
+  socket.on('sensor_update', (payload) => {
+    const selectedField = Number(document.getElementById('fieldSelect')?.value || 0);
+    if (!payload || Number(payload.field_id) !== selectedField) return;
+    renderStatusFromPayload(payload, payload.device_status || {});
+    setActionStatus(
+      tr('runtime.lastUpdated', 'Last updated: {time}', {
+        time: new Date().toLocaleTimeString(),
+      })
+    );
+  });
 }
 
 async function initializeStatus() {
@@ -175,6 +236,9 @@ async function initializeStatus() {
   const fieldId = fields[0].field_id;
   await refreshStatus(fieldId);
   setActionStatus(t('status.statusReady', 'Status is ready.'));
+  setupRealtimeSocket();
+  subscribeToFieldRealtime(fieldId);
+  startAutoRefresh();
 
   document.getElementById('refreshBtn').addEventListener('click', async () => {
     const selectedField = document.getElementById('fieldSelect').value;
@@ -189,6 +253,8 @@ async function initializeStatus() {
       await refreshStatus(event.target.value);
       setActionStatus(t('status.statusFieldUpdated', 'Field switched and status updated.'));
     }, t('status.loadingField', 'Loading selected field status...'));
+    subscribeToFieldRealtime(event.target.value);
+    startAutoRefresh();
   });
 }
 
@@ -204,4 +270,17 @@ window.addEventListener('languageChanged', async () => {
     await loadStatus(fieldId);
     setActionStatus(t('status.statusLanguageUpdated', 'Language updated.'));
   }, t('status.loadingLanguage', 'Refreshing localized status...'));
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    startAutoRefresh();
+    autoRefreshStatus();
+    return;
+  }
+
+  if (autoRefreshTimer) {
+    clearInterval(autoRefreshTimer);
+    autoRefreshTimer = null;
+  }
 });

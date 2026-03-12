@@ -3,6 +3,8 @@ let autoRefreshTimer = null;
 let latestHistoryRows = [];
 let latestReading = null;
 let latestRecommendation = null;
+let socket = null;
+let subscribedFieldId = null;
 
 function t(key, fallback = '') {
   return window.i18n?.t(key, fallback) || fallback;
@@ -221,14 +223,16 @@ function updateSessionPanel() {
   const hoursSelect = document.getElementById('hoursSelect');
   const autoRefreshSelect = document.getElementById('autoRefreshSelect');
   const chartMetricSelect = document.getElementById('chartMetricSelect');
+  const dataViewSelect = document.getElementById('dataViewSelect');
 
   const hours = hoursSelect?.value || '48';
   const autoRefresh = autoRefreshSelect?.value || '0';
   const chartFocusLabel = chartMetricSelect?.options[chartMetricSelect.selectedIndex]?.textContent || t('dashboard.focusAll', 'All Metrics');
+  const dataViewLabel = dataViewSelect?.options[dataViewSelect.selectedIndex]?.textContent || 'Real-time Live';
 
   updateDetailRow('detailWindow', tr('dashboard.windowValue', '{hours} hours', { hours }));
   updateDetailRow('detailAutoRefresh', autoRefresh === '0' ? t('dashboard.off', 'Off') : tr('dashboard.secondsValue', '{seconds}s', { seconds: autoRefresh }));
-  updateDetailRow('detailChartFocus', chartFocusLabel);
+  updateDetailRow('detailChartFocus', `${chartFocusLabel} | ${dataViewLabel}`);
 }
 
 function updateHistoryMeta(rows) {
@@ -282,14 +286,18 @@ function exportHistoryCsv() {
     return;
   }
 
-  const header = ['recorded_at', 'soil_moisture', 'temperature_c', 'humidity', 'rain_detected', 'source_type'];
+  const mode = document.getElementById('dataViewSelect')?.value || 'realtime';
+  const header = mode === 'daily'
+    ? ['summary_date', 'avg_moisture', 'avg_temperature', 'avg_humidity', 'rain_frequency', 'generated_at']
+    : ['recorded_at', 'soil_moisture', 'temperature_c', 'humidity', 'rain_detected', 'source_type'];
+
   const lines = latestHistoryRows.map((row) => [
-    row.recorded_at,
-    row.soil_moisture,
-    row.temperature_c,
-    row.humidity,
-    row.rain_detected,
-    row.source_type,
+    mode === 'daily' ? row.summary_date : row.recorded_at,
+    mode === 'daily' ? row.avg_moisture : row.soil_moisture,
+    mode === 'daily' ? row.avg_temperature : row.temperature_c,
+    mode === 'daily' ? row.avg_humidity : row.humidity,
+    mode === 'daily' ? row.rain_frequency : row.rain_detected,
+    mode === 'daily' ? row.generated_at : row.source_type,
   ].join(','));
 
   const csvContent = [header.join(','), ...lines].join('\n');
@@ -302,10 +310,7 @@ function exportHistoryCsv() {
   URL.revokeObjectURL(url);
 }
 
-async function loadLatest(fieldId) {
-  const data = await loadLatestPayload(fieldId);
-  const reading = data.latest_reading;
-  const recommendation = data.latest_recommendation;
+function renderLatestPanels(reading, recommendation) {
   latestReading = reading;
   latestRecommendation = recommendation;
 
@@ -349,19 +354,99 @@ async function loadLatest(fieldId) {
   renderWeeklySummary(latestReading, latestRecommendation, latestHistoryRows);
 }
 
+async function loadLatest(fieldId) {
+  const data = await loadLatestPayload(fieldId);
+  renderLatestPanels(data.latest_reading, data.latest_recommendation);
+}
+
+function subscribeToFieldRealtime(fieldId) {
+  if (!socket || !fieldId) return;
+
+  if (subscribedFieldId && Number(subscribedFieldId) !== Number(fieldId)) {
+    socket.emit('unsubscribe_field', { field_id: Number(subscribedFieldId) });
+  }
+
+  subscribedFieldId = Number(fieldId);
+  socket.emit('subscribe_field', { field_id: Number(fieldId) });
+}
+
+function setupRealtimeSocket() {
+  if (!window.io) return;
+  socket = window.io();
+
+  socket.on('connect', () => {
+    const selectedField = document.getElementById('fieldSelect')?.value;
+    if (selectedField) subscribeToFieldRealtime(selectedField);
+  });
+
+  socket.on('sensor_update', (payload) => {
+    const selectedField = Number(document.getElementById('fieldSelect')?.value || 0);
+    if (!payload || Number(payload.field_id) !== selectedField) return;
+
+    renderLatestPanels(payload.latest_reading, payload.latest_recommendation);
+
+    // Append new data point to chart in real-time without re-fetching history
+    const mode = document.getElementById('dataViewSelect')?.value || 'realtime';
+    if (trendChart && payload.latest_reading && mode === 'realtime') {
+      const reading = payload.latest_reading;
+      const label = new Date(reading.recorded_at).toLocaleString();
+      const selectedMetric = document.getElementById('chartMetricSelect')?.value || 'all';
+
+      trendChart.data.labels.push(label);
+
+      trendChart.data.datasets.forEach((ds) => {
+        if (ds.label.includes('Moisture') || ds.label.includes('moisture')) {
+          ds.data.push(reading.soil_moisture);
+        } else if (ds.label.includes('Temperature') || ds.label.includes('temperature') || ds.label.includes('Temp')) {
+          ds.data.push(reading.temperature_c);
+        } else if (ds.label.includes('Humidity') || ds.label.includes('humidity')) {
+          ds.data.push(reading.humidity);
+        }
+      });
+
+      // Keep chart from growing unbounded — trim oldest points beyond window
+      const maxPoints = 500;
+      if (trendChart.data.labels.length > maxPoints) {
+        trendChart.data.labels.shift();
+        trendChart.data.datasets.forEach((ds) => ds.data.shift());
+      }
+
+      trendChart.update('none'); // 'none' disables animation for instant update
+
+      // Also update the in-memory history rows
+      latestHistoryRows.push({
+        recorded_at: reading.recorded_at,
+        soil_moisture: reading.soil_moisture,
+        temperature_c: reading.temperature_c,
+        humidity: reading.humidity,
+        rain_detected: reading.rain_detected,
+        source_type: reading.source_type,
+      });
+      updateHistoryMeta(latestHistoryRows);
+    }
+  });
+}
+
 async function loadHistory(fieldId) {
   updateSessionPanel();
 
+  const mode = document.getElementById('dataViewSelect')?.value || 'realtime';
   const selectedHours = document.getElementById('hoursSelect').value || '48';
-  const rows = await fetchJson(`/api/fields/${fieldId}/history?hours=${selectedHours}`);
+  const rows = await fetchJson(`/api/fields/${fieldId}/history?hours=${selectedHours}&mode=${mode}`);
   latestHistoryRows = rows;
-  const rowsForChart = clampMoistureOutliers(removeStartupSpike(rows));
+  const rowsForChart = mode === 'realtime' ? clampMoistureOutliers(removeStartupSpike(rows)) : rows;
   updateHistoryMeta(rowsForChart);
 
-  const labels = rowsForChart.map((row) => new Date(row.recorded_at).toLocaleString());
-  const moisture = rowsForChart.map((row) => row.soil_moisture);
-  const temp = rowsForChart.map((row) => row.temperature_c);
-  const humidity = rowsForChart.map((row) => row.humidity);
+  const labels = rowsForChart.map((row) => {
+    if (mode === 'daily') {
+      return new Date(`${row.summary_date}T00:00:00`).toLocaleDateString();
+    }
+    return new Date(row.recorded_at).toLocaleString();
+  });
+
+  const moisture = rowsForChart.map((row) => mode === 'daily' ? row.avg_moisture : row.soil_moisture);
+  const temp = rowsForChart.map((row) => mode === 'daily' ? row.avg_temperature : row.temperature_c);
+  const humidity = rowsForChart.map((row) => mode === 'daily' ? row.avg_humidity : row.humidity);
   const selectedMetric = document.getElementById('chartMetricSelect')?.value || 'all';
 
   const datasets = [];
@@ -449,12 +534,13 @@ async function loadHistory(fieldId) {
     },
   });
 
-  await loadComparisons(fieldId);
+  if (mode !== 'daily') {
+    await loadComparisons(fieldId);
+  }
   renderWeeklySummary(latestReading, latestRecommendation, latestHistoryRows);
 }
 
 async function refreshDashboard(fieldId) {
-  await runRuleSuggestion(fieldId);
   await Promise.all([loadLatest(fieldId), loadHistory(fieldId)]);
 }
 
@@ -479,7 +565,10 @@ async function initializeDashboard() {
   const fields = await loadFields('fieldSelect');
   if (!fields.length) return;
 
+  setupRealtimeSocket();
+
   const fieldId = fields[0].field_id;
+  subscribeToFieldRealtime(fieldId);
   await refreshDashboard(fieldId);
 
   document.getElementById('refreshBtn').addEventListener('click', async () => {
@@ -507,6 +596,7 @@ async function initializeDashboard() {
   });
 
   document.getElementById('fieldSelect').addEventListener('change', async (event) => {
+    subscribeToFieldRealtime(event.target.value);
     await refreshDashboard(event.target.value);
   });
 
@@ -516,6 +606,12 @@ async function initializeDashboard() {
   });
 
   document.getElementById('chartMetricSelect').addEventListener('change', async () => {
+    const selectedField = document.getElementById('fieldSelect').value;
+    await loadHistory(selectedField);
+  });
+
+  document.getElementById('dataViewSelect').addEventListener('change', async () => {
+    updateSessionPanel();
     const selectedField = document.getElementById('fieldSelect').value;
     await loadHistory(selectedField);
   });

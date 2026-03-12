@@ -340,6 +340,83 @@ async function loadSuggestion(fieldId) {
   setText('actionPlanInsight', details.plan);
 }
 
+let socket = null;
+let subscribedFieldId = null;
+
+function renderSuggestionFromPayload(recommendation, reading) {
+  if (!recommendation) {
+    renderFallbackState();
+    return;
+  }
+
+  const riskLevel = classifySuggestionRisk(reading);
+  const confidenceScore = Number(recommendation.confidence_score || 0);
+
+  setText('healthStatus', recommendation.crop_health_status);
+  setText('irrigationAction', recommendation.irrigation_action);
+  setText('resourceTip', recommendation.resource_optimization_tip);
+  setText('confidence', `${(confidenceScore * 100).toFixed(0)}%`);
+  setText('summary', recommendation.generated_summary);
+  setText('suggestionRisk', riskLabel(riskLevel));
+  const priority = determinePriority(riskLevel, confidenceScore);
+  setText('priorityLevel', priority);
+  setText('nextCheck', determineNextCheck(riskLevel));
+  setText('generatedAt', formatTime(recommendation.generated_at));
+
+  if (reading) {
+    setText('moistureNow', `${Number(reading.soil_moisture).toFixed(1)}%`);
+    setText('tempNow', `${Number(reading.temperature_c).toFixed(1)}°C`);
+    setText('humidityNow', `${Number(reading.humidity).toFixed(1)}%`);
+    setText('rainNow', Number(reading.rain_detected) === 1 ? t('runtime.rainDetected', 'Rain Detected') : t('runtime.noRain', 'No Rain'));
+  } else {
+    setText('moistureNow', '--');
+    setText('tempNow', '--');
+    setText('humidityNow', '--');
+    setText('rainNow', '--');
+  }
+
+  setChecklist(buildChecklist(reading, recommendation));
+  setImprovementList(buildImprovementSuggestions(reading, recommendation));
+
+  const details = buildDetailedInsights(reading, recommendation, riskLevel, priority);
+  setText('insightOverview', details.overview);
+  setText('moistureInsight', details.moisture);
+  setText('weatherInsight', details.weather);
+  setText('actionPlanInsight', details.plan);
+}
+
+function subscribeToFieldRealtime(fieldId) {
+  if (!socket || !fieldId) return;
+
+  if (subscribedFieldId && Number(subscribedFieldId) !== Number(fieldId)) {
+    socket.emit('unsubscribe_field', { field_id: Number(subscribedFieldId) });
+  }
+
+  subscribedFieldId = Number(fieldId);
+  socket.emit('subscribe_field', { field_id: Number(fieldId) });
+}
+
+function setupRealtimeSocket() {
+  if (!window.io) return;
+
+  socket = window.io();
+  socket.on('connect', () => {
+    const selectedField = document.getElementById('fieldSelect')?.value;
+    if (selectedField) subscribeToFieldRealtime(selectedField);
+  });
+
+  socket.on('sensor_update', (payload) => {
+    const selectedField = Number(document.getElementById('fieldSelect')?.value || 0);
+    if (!payload || Number(payload.field_id) !== selectedField) return;
+    renderSuggestionFromPayload(payload.latest_recommendation, payload.latest_reading);
+    setActionStatus(
+      formatTemplate(t('runtime.lastUpdated', 'Last updated: {time}'), {
+        time: new Date().toLocaleTimeString(),
+      })
+    );
+  });
+}
+
 async function refreshSuggestion(fieldId) {
   await runRuleSuggestion(fieldId);
   await loadSuggestion(fieldId);
@@ -349,7 +426,10 @@ async function initializeSuggestions() {
   const fields = await loadFields('fieldSelect');
   if (!fields.length) return;
 
+  setupRealtimeSocket();
+
   const fieldId = fields[0].field_id;
+  subscribeToFieldRealtime(fieldId);
   await refreshSuggestion(fieldId);
   setActionStatus(t('suggestions.statusReady', 'Ready'));
 
@@ -378,6 +458,7 @@ async function initializeSuggestions() {
   });
 
   document.getElementById('fieldSelect').addEventListener('change', async (event) => {
+    subscribeToFieldRealtime(event.target.value);
     await runWithBusy(async () => {
       await refreshSuggestion(event.target.value);
       setActionStatus(t('suggestions.statusFieldUpdated', 'Field changed and suggestions updated.'));

@@ -6,6 +6,7 @@
 
 {% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -29,13 +30,22 @@
       </div>
 
       <div class="control-item">
+        <label for="dataViewSelect">Data View</label>
+        <select id="dataViewSelect">
+          <option value="realtime" selected>Real-time Live</option>
+          <option value="hourly">Hourly (Today)</option>
+          <option value="daily">Daily Summaries</option>
+        </select>
+      </div>
+
+      <div class="control-item">
         <label for="autoRefreshSelect" data-i18n="dashboard.autoRefresh">Auto Refresh</label>
         <select id="autoRefreshSelect">
           <option value="0" data-i18n="dashboard.off">Off</option>
-          <option value="15">Every 15s</option>
+          <option value="5">Every 5s</option>
+          <option value="10" selected>Every 10s</option>
           <option value="30" data-i18n="dashboard.every30">Every 30s</option>
-          <option value="60" selected data-i18n="dashboard.every60">Every 60s</option>
-          <option value="120" data-i18n="dashboard.every120">Every 2 min</option>
+          <option value="60" data-i18n="dashboard.every60">Every 60s</option>
         </select>
       </div>
 

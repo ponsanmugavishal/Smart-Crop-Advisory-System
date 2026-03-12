@@ -2,6 +2,10 @@
 
 {% block title %}Status{% endblock %}
 
+{% block extra_head %}
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+{% endblock %}
+
 {% block content %}
 <section class="controls card">
   <div class="control-item grow">
@@ -88,5 +92,5 @@
 
 {% block scripts %}
 <script src="/static/common.js"></script>
-<script src="/static/status.js"></script>
+<script src="/static/status.js?v=20260307b"></script>
 {% endblock %}

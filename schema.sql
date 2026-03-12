@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS sensor_reading (
     rain_detected TINYINT(1) NOT NULL,
     temperature_c DECIMAL(5,2) NOT NULL,
     humidity_percent DECIMAL(5,2) NOT NULL,
-    source_type ENUM('scheduled', 'realtime') NOT NULL DEFAULT 'scheduled',
+    source_type ENUM('scheduled', 'realtime', 'hourly') NOT NULL DEFAULT 'scheduled',
     recorded_at DATETIME NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_reading_field FOREIGN KEY (field_id)
@@ -70,6 +70,25 @@ CREATE TABLE IF NOT EXISTS sensor_reading (
     INDEX idx_reading_field_time (field_id, recorded_at),
     INDEX idx_reading_time (recorded_at),
     INDEX idx_reading_source (source_type)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS daily_summary (
+    summary_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    field_id INT NOT NULL,
+    avg_moisture DECIMAL(6,2) NOT NULL,
+    avg_temperature DECIMAL(6,2) NOT NULL,
+    avg_humidity DECIMAL(6,2) NOT NULL,
+    rain_frequency INT NOT NULL DEFAULT 0,
+    summary_date DATE NOT NULL,
+    generated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_daily_summary_field FOREIGN KEY (field_id)
+        REFERENCES field(field_id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    UNIQUE KEY uq_daily_summary_field_date (field_id, summary_date),
+    INDEX idx_daily_summary_field (field_id),
+    INDEX idx_daily_summary_date (summary_date),
+    INDEX idx_daily_summary_field_date (field_id, summary_date)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS recommendation (

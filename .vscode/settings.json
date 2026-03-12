@@ -1,5 +1,6 @@
 {
   "files.associations": {
     "*.ino": "cpp"
-  }
+  },
+  "python.terminal.useEnvFile": true
 }

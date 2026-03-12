@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from dataclasses import dataclass
+import json
+import os
 from pathlib import Path
+import re
 from typing import Any, Dict, List, Tuple
+from urllib import error, request
 
 try:
     import joblib
@@ -40,6 +44,167 @@ def _normalize_language(language: str | None) -> str:
     if language in {"en", "ta", "hi"}:
         return language
     return "en"
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _extract_first_json_object(text: str) -> Dict[str, Any] | None:
+    if not text:
+        return None
+
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict):
+            return parsed
+    except Exception:
+        pass
+
+    match = re.search(r"\{[\s\S]*\}", text)
+    if not match:
+        return None
+
+    try:
+        parsed = json.loads(match.group(0))
+        return parsed if isinstance(parsed, dict) else None
+    except Exception:
+        return None
+
+
+def _llm_prompt(current: Dict, history: List[Dict], language: str) -> str:
+    recent = history[:6] if history else []
+    return (
+        "You are an agronomy assistant for smart farming. "
+        "Return only valid JSON with keys: irrigation_action, crop_health_status, "
+        "resource_optimization_tip, confidence_score, generated_summary. "
+        "confidence_score must be a number between 0.55 and 0.99. "
+        f"Language code: {language}. "
+        f"Current sensor reading: {json.dumps(current, ensure_ascii=False)}. "
+        f"Recent history: {json.dumps(recent, ensure_ascii=False)}."
+    )
+
+
+def _call_gemini(prompt: str, timeout_seconds: float) -> Dict[str, Any] | None:
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        return None
+
+    model = (os.getenv("GEMINI_MODEL", "gemini-1.5-flash") or "gemini-1.5-flash").strip()
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 500},
+    }
+
+    req = request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        with request.urlopen(req, timeout=timeout_seconds) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+    except (error.URLError, error.HTTPError, TimeoutError, json.JSONDecodeError):
+        return None
+
+    candidates = body.get("candidates") or []
+    if not candidates:
+        return None
+    parts = candidates[0].get("content", {}).get("parts", [])
+    text = "\n".join(str(part.get("text", "")) for part in parts)
+    return _extract_first_json_object(text)
+
+
+def _call_openai(prompt: str, timeout_seconds: float) -> Dict[str, Any] | None:
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        return None
+
+    model = (os.getenv("OPENAI_MODEL", "gpt-4o-mini") or "gpt-4o-mini").strip()
+    url = "https://api.openai.com/v1/chat/completions"
+    payload = {
+        "model": model,
+        "temperature": 0.2,
+        "messages": [
+            {"role": "system", "content": "Return only valid JSON."},
+            {"role": "user", "content": prompt},
+        ],
+    }
+
+    req = request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+        method="POST",
+    )
+
+    try:
+        with request.urlopen(req, timeout=timeout_seconds) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+    except (error.URLError, error.HTTPError, TimeoutError, json.JSONDecodeError):
+        return None
+
+    choices = body.get("choices") or []
+    if not choices:
+        return None
+    content = str(choices[0].get("message", {}).get("content", ""))
+    return _extract_first_json_object(content)
+
+
+def _generate_external_recommendation(current: Dict, history: List[Dict], language: str) -> RecommendationResult | None:
+    provider = (os.getenv("AI_PROVIDER", "gemini") or "gemini").strip().lower()
+    if provider not in {"gemini", "openai"}:
+        return None
+
+    timeout_seconds = float(os.getenv("AI_REQUEST_TIMEOUT", "12") or "12")
+    prompt = _llm_prompt(current, history, language)
+
+    raw = _call_gemini(prompt, timeout_seconds) if provider == "gemini" else _call_openai(prompt, timeout_seconds)
+    if not isinstance(raw, dict):
+        return None
+
+    irrigation_action = str(raw.get("irrigation_action", "")).strip()
+    crop_health_status = str(raw.get("crop_health_status", "")).strip()
+    resource_optimization_tip = str(raw.get("resource_optimization_tip", "")).strip()
+    generated_summary = str(raw.get("generated_summary", "")).strip()
+
+    try:
+        confidence = float(raw.get("confidence_score", 0.75))
+    except Exception:
+        confidence = 0.75
+    confidence = round(_clamp(confidence, 0.55, 0.99), 2)
+
+    if not irrigation_action or not crop_health_status or not resource_optimization_tip or not generated_summary:
+        return None
+
+    return RecommendationResult(
+        irrigation_action=irrigation_action,
+        crop_health_status=crop_health_status,
+        resource_optimization_tip=resource_optimization_tip,
+        confidence_score=confidence,
+        generated_summary=f"Gemini suggestion: {generated_summary}" if provider == "gemini" else generated_summary,
+    )
+
+
+def get_ai_provider_status() -> Dict[str, Any]:
+    provider = (os.getenv("AI_PROVIDER", "gemini") or "gemini").strip().lower()
+    require_gemini = _env_bool("REQUIRE_GEMINI", True)
+    gemini_configured = bool((os.getenv("GEMINI_API_KEY", "") or "").strip())
+
+    return {
+        "provider": provider,
+        "require_gemini": require_gemini,
+        "gemini_configured": gemini_configured,
+    }
 
 
 def _compute_risk_score(moisture: float, rain: int, temp: float, humidity: float) -> float:
@@ -449,6 +614,10 @@ def _load_model_artifact() -> Dict[str, Any] | None:
         return None
 
     if not MODEL_FILE_PATH.exists():
+        auto_train_local = _env_bool("AUTO_TRAIN_LOCAL_MODEL", False)
+        if not auto_train_local:
+            return None
+
         trained = train_and_save_model(MODEL_FILE_PATH)
         if not trained:
             return None
@@ -529,8 +698,12 @@ def _predict_classes_with_model(current: Dict, history: List[Dict]) -> Tuple[str
     return irrigation_class, health_class, confidence
 
 
-def generate_recommendation(current: Dict, history: List[Dict], language: str = "en") -> RecommendationResult:
-    """ML-backed recommendation with automatic rule fallback."""
+def generate_recommendation(current: Dict, history: List[Dict], language: str = "en", use_external: bool = True) -> RecommendationResult:
+    """ML-backed recommendation with automatic rule fallback.
+
+    When *use_external* is False the external LLM provider (Gemini / OpenAI)
+    is skipped entirely and only the local ML model or rule engine is used.
+    """
     moisture = float(current.get("soil_moisture", 0.0))
     rain = int(current.get("rain_detected", 0))
     temp = float(current.get("temperature_c", 0.0))
@@ -540,6 +713,17 @@ def generate_recommendation(current: Dict, history: List[Dict], language: str = 
     avg_moisture = _safe_average([float(x.get("soil_moisture", moisture)) for x in history], moisture)
     avg_temp = _safe_average([float(x.get("temperature_c", temp)) for x in history], temp)
     avg_humidity = _safe_average([float(x.get("humidity", humidity)) for x in history], humidity)
+
+    provider = (os.getenv("AI_PROVIDER", "gemini") or "gemini").strip().lower()
+    require_gemini = _env_bool("REQUIRE_GEMINI", True)
+
+    if use_external:
+        external = _generate_external_recommendation(current, history, language)
+        if external is not None:
+            return external
+
+        if provider == "gemini" and require_gemini:
+            raise RuntimeError("Gemini suggestion is required but unavailable. Set GEMINI_API_KEY and verify connectivity.")
 
     model_prediction = _predict_classes_with_model(current, history)
 

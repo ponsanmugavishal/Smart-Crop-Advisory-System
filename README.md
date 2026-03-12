@@ -49,6 +49,19 @@ Optional: retrain model manually:
 6. Open dashboard:
    - `http://127.0.0.1:5000/`
 
+### Gemini Integration (recommended)
+
+To force all suggestions from Gemini, set these environment variables in `.env`:
+
+- `AI_PROVIDER=gemini`
+- `GEMINI_API_KEY=your_api_key`
+- `REQUIRE_GEMINI=true`
+- Optional: `GEMINI_MODEL=gemini-1.5-flash`
+- Optional: `AI_REQUEST_TIMEOUT=12`
+
+Provider status API:
+- `GET /api/ai/provider`
+
 ## 4) API Overview
 
 - `POST /api/ingest`
@@ -67,6 +80,10 @@ Optional: retrain model manually:
 - Configure WiFi SSID/password and Flask server URL in `esp32/SmartFarmNode.ino`.
 - Keep ESP32 and Flask server on reachable network.
 - Sampling schedule is implemented via NTP-based hour checks.
+- Offline hourly buffering uses a real **SQLite database** on SD card (`/sd/hourly_queue.db`), not CSV.
+- Every hourly aggregate is saved to SD-card SQLite first, regardless of upload success/failure.
+- End-of-day average is computed from all hourly rows and stored in local `daily_averages` table.
+- Install an ESP32-compatible SQLite library in Arduino IDE (for example, `SQLite3` / `sqlite3.h`) before compiling firmware.
 
 ## 6) DBMS Design Notes
 
